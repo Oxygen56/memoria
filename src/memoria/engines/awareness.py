@@ -11,7 +11,6 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
 
 from memoria.core.config import AwarenessConfig
 from memoria.core.models import (
@@ -43,7 +42,7 @@ class AwarenessEngine:
         self,
         storage: MemoryStoreAdapter,
         embedding_provider: EmbeddingProvider,
-        config: Optional[AwarenessConfig] = None,
+        config: AwarenessConfig | None = None,
     ):
         self._storage = storage
         self._embedding = embedding_provider
@@ -54,8 +53,8 @@ class AwarenessEngine:
     async def get_context(
         self,
         input_text: str,
-        context_window: Optional[List[str]] = None,
-        token_budget: Optional[int] = None,
+        context_window: list[str] | None = None,
+        token_budget: int | None = None,
     ) -> ContextInjection:
         """
         Main entry point. Called at the start of every agent turn.
@@ -97,7 +96,7 @@ class AwarenessEngine:
         )
 
         # Step 3: Score relevance of each candidate against the fingerprint
-        scored: List[Tuple[MemoryRecord, float]] = []
+        scored: list[tuple[MemoryRecord, float]] = []
         for mem in candidates:
             relevance = self._score_relevance(mem, fingerprint)
             if relevance >= self._config.relevance_threshold:
@@ -110,7 +109,7 @@ class AwarenessEngine:
         )
 
         # Step 5: Pack into token budget
-        injected: List[InjectItem] = []
+        injected: list[InjectItem] = []
         token_count = 0
 
         for mem, score in scored:
@@ -136,7 +135,7 @@ class AwarenessEngine:
     async def _compute_fingerprint(
         self,
         input_text: str,
-        context_window: List[str],
+        context_window: list[str],
     ) -> SemanticFingerprint:
         """Build a semantic fingerprint of the current conversation state."""
         # Combine current input with recent context
@@ -159,13 +158,13 @@ class AwarenessEngine:
             version=self._config.fingerprint_version,
         )
 
-    def _extract_key_terms(self, text: str) -> List[str]:
+    def _extract_key_terms(self, text: str) -> list[str]:
         """Extract meaningful key terms without an LLM call.
 
         Uses regex patterns for common technical identifiers
         plus noun phrase heuristics.
         """
-        terms: List[str] = []
+        terms: list[str] = []
 
         # Pattern 1: Technical identifiers
         tech_patterns = [
@@ -204,7 +203,7 @@ class AwarenessEngine:
                 unique.append(t)
         return unique[:20]  # Cap at 20 terms
 
-    def _build_search_query(self, key_terms: List[str], input_text: str) -> str:
+    def _build_search_query(self, key_terms: list[str], input_text: str) -> str:
         """Build a keyword search query from extracted terms."""
         # Use the most distinctive terms (rarer = better for search)
         distinctive = sorted(
@@ -271,14 +270,14 @@ class AwarenessEngine:
     # ── Utilities ────────────────────────────────────
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors."""
         if len(a) != len(b):
             # Truncate to shorter
             min_len = min(len(a), len(b))
             a, b = a[:min_len], b[:min_len]
 
-        dot = sum(x * y for x, y in zip(a, b))
+        dot = sum(x * y for x, y in zip(a, b))  # noqa: B905
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(y * y for y in b))
 

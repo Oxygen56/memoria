@@ -14,7 +14,6 @@ import os
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,10 @@ _STOP_WORDS = {
     "your", "our", "we", "you", "i", "me", "us",
 }
 
-_NEGATION_MARKERS = ("not ", "never ", "don't ", "doesn't ", "isn't ", "aren't ", "won't ", "can't ")
+_NEGATION_MARKERS = (
+    "not ", "never ", "don't ", "doesn't ",
+    "isn't ", "aren't ", "won't ", "can't ",
+)
 
 _SYSTEM_PROMPT = (
     "You are a contradiction detector. Given two statements about a system or "
@@ -81,8 +83,8 @@ class LLMContradictionProvider(ContradictionProvider):
     def __init__(
         self,
         model: str = "deepseek-v4-pro",
-        api_key: Optional[str] = None,
-        api_base: Optional[str] = None,
+        api_key: str | None = None,
+        api_base: str | None = None,
         temperature: float = 0.0,
         timeout: float = 30.0,
     ):
@@ -177,11 +179,11 @@ class CrossEncoderContradictionProvider(ContradictionProvider):
         try:
             from sentence_transformers import CrossEncoder
             self._model = CrossEncoder(self._model_name)
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "sentence-transformers required for CrossEncoder provider. "
                 "Install: pip install sentence-transformers"
-            )
+            ) from err
 
     async def check(self, content_a: str, content_b: str) -> ContradictionResult:
         """Use CrossEncoder NLI to detect contradiction.
@@ -302,8 +304,8 @@ class ContradictionProviderFactory:
     def create(
         provider_type: str = "llm",
         model: str = "deepseek-v4-pro",
-        api_key: Optional[str] = None,
-        api_base: Optional[str] = None,
+        api_key: str | None = None,
+        api_base: str | None = None,
         fallback_type: str = "heuristic",
         **kwargs,
     ) -> ContradictionProvider:
@@ -335,8 +337,8 @@ class ContradictionProviderFactory:
     def _build_provider(
         provider_type: str,
         model: str = "deepseek-v4-pro",
-        api_key: Optional[str] = None,
-        api_base: Optional[str] = None,
+        api_key: str | None = None,
+        api_base: str | None = None,
         **kwargs,
     ) -> ContradictionProvider:
         """Instantiate a single provider by type string."""

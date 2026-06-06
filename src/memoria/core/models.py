@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import math
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 # ── Enums ────────────────────────────────────────
 
@@ -69,19 +67,19 @@ class MemoryRecord:
     decay_acceleration: float = 1.0
 
     # Relationships
-    related_memories: List[str] = field(default_factory=list)
-    source_conversation_id: Optional[str] = None
-    contradiction_of: Optional[str] = None
+    related_memories: list[str] = field(default_factory=list)
+    source_conversation_id: str | None = None
+    contradiction_of: str | None = None
 
     # Metadata
-    user_id: Optional[str] = None
-    agent_id: Optional[str] = None
-    session_id: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
-    custom_metadata: Dict[str, Any] = field(default_factory=dict)
+    user_id: str | None = None
+    agent_id: str | None = None
+    session_id: str | None = None
+    tags: list[str] = field(default_factory=list)
+    custom_metadata: dict[str, Any] = field(default_factory=dict)
 
     # Embedding (populated at insert time by embedding provider)
-    embedding: Optional[List[float]] = None
+    embedding: list[float] | None = None
 
     # Audit
     created_by: str = "agent"
@@ -99,7 +97,7 @@ class MemoryRecord:
         days = (datetime.now(timezone.utc) - self.last_accessed).days
         return days > (3 * self.half_life_days)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {
             "id": self.id,
             "content": self.content,
@@ -128,7 +126,7 @@ class MemoryRecord:
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "MemoryRecord":
+    def from_dict(cls, d: dict[str, Any]) -> MemoryRecord:
         return cls(
             id=d.get("id", f"mem_{uuid.uuid4().hex[:12]}"),
             content=d.get("content", ""),
@@ -161,11 +159,12 @@ class MemoryEvent:
     """Emitted on every memory state change — powers the Dashboard WebSocket."""
 
     event_id: str = field(default_factory=lambda: f"evt_{uuid.uuid4().hex[:8]}")
-    event_type: str = ""  # created|accessed|modified|decayed|archived|forgotten|contradicted|reinforced
+    # created|accessed|modified|decayed|archived|forgotten|contradicted|reinforced
+    event_type: str = ""
     memory_id: str = ""
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    previous_state: Optional[Dict[str, Any]] = None
-    new_state: Optional[Dict[str, Any]] = None
+    previous_state: dict[str, Any] | None = None
+    new_state: dict[str, Any] | None = None
     trigger: str = "system"
 
 
@@ -181,8 +180,8 @@ class InjectItem:
 class ContextInjection:
     """Result of Awareness Engine: memories to inject into agent context."""
 
-    hot: List[MemoryRecord] = field(default_factory=list)
-    relevant: List[InjectItem] = field(default_factory=list)
+    hot: list[MemoryRecord] = field(default_factory=list)
+    relevant: list[InjectItem] = field(default_factory=list)
     total_tokens: int = 0
     fingerprint_version: str = "v2"
 
@@ -191,8 +190,8 @@ class ContextInjection:
 class SemanticFingerprint:
     """Lightweight semantic signature of a conversation turn."""
 
-    embedding: List[float] = field(default_factory=list)
-    key_terms: List[str] = field(default_factory=list)
+    embedding: list[float] = field(default_factory=list)
+    key_terms: list[str] = field(default_factory=list)
     search_query: str = ""
     version: str = "v2"
 
@@ -212,8 +211,8 @@ class Contradiction:
 class DecayCycleReport:
     """Result of a Decay Engine processing cycle."""
 
-    events: List[MemoryEvent] = field(default_factory=list)
-    stats: Dict[str, int] = field(default_factory=dict)
+    events: list[MemoryEvent] = field(default_factory=list)
+    stats: dict[str, int] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -222,8 +221,8 @@ class StorageStats:
     """Statistics for a storage backend."""
 
     total_memories: int = 0
-    by_layer: Dict[str, int] = field(default_factory=dict)
-    by_type: Dict[str, int] = field(default_factory=dict)
+    by_layer: dict[str, int] = field(default_factory=dict)
+    by_type: dict[str, int] = field(default_factory=dict)
     storage_size_bytes: int = 0
     backend_type: str = ""
 
@@ -245,7 +244,7 @@ class MemoryAccessLog:
     memory_id: str = ""
     accessed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     context: str = ""  # truncated to 200 chars
-    session_id: Optional[str] = None
+    session_id: str | None = None
     trigger: str = "awareness"  # awareness, explicit_search, manual
 
 

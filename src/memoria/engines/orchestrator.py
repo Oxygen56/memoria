@@ -10,7 +10,7 @@ Key coordination rules:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Set
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from memoria.engines.awareness import AwarenessEngine
@@ -36,10 +36,10 @@ class EngineOrchestrator:
 
     def __init__(
         self,
-        awareness: Optional["AwarenessEngine"] = None,
-        decay: Optional["DecayEngine"] = None,
-        feedback: Optional["FeedbackEngine"] = None,
-        graph: Optional["GraphEngine"] = None,
+        awareness: AwarenessEngine | None = None,
+        decay: DecayEngine | None = None,
+        feedback: FeedbackEngine | None = None,
+        graph: GraphEngine | None = None,
     ):
         self._awareness = awareness
         self._decay = decay
@@ -60,7 +60,7 @@ class EngineOrchestrator:
         if not injection.relevant:
             return injection
 
-        filtered_relevant: List[InjectItem] = []
+        filtered_relevant: list[InjectItem] = []
 
         for item in injection.relevant:
             # Rule 1: Skip contradicted memories
@@ -136,13 +136,13 @@ class EngineOrchestrator:
     # ── Graph Coordination ────────────────────────────
 
     async def enrich_with_graph(
-        self, memory_ids: List[str], max_hops: int = 1
-    ) -> Set[str]:
+        self, memory_ids: list[str], max_hops: int = 1
+    ) -> set[str]:
         """Discover additional relevant memories through graph connections."""
         if not self._graph:
             return set()
 
-        discovered: Set[str] = set()
+        discovered: set[str] = set()
         for mid in memory_ids:
             related = await self._graph.get_related_memories(mid, max_hops)
             discovered.update(related)
@@ -153,7 +153,7 @@ class EngineOrchestrator:
 
     # ── Stats ─────────────────────────────────────────
 
-    def get_coordination_stats(self) -> Dict[str, any]:
+    def get_coordination_stats(self) -> dict[str, any]:
         """Return orchestrator statistics."""
         return {
             "has_awareness": self._awareness is not None,

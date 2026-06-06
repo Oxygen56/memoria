@@ -9,7 +9,7 @@ Used as:
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from memoria.core.exceptions import MemoryNotFoundError, StorageError
 from memoria.core.models import MemoryLayer, MemoryRecord, StorageStats
@@ -35,17 +35,17 @@ class InMemoryAdapter(MemoryStoreAdapter):
         Args:
             **kwargs: Ignored (accepted for compatibility with adapter factory).
         """
-        self._store: Dict[str, MemoryRecord] = {}
+        self._store: dict[str, MemoryRecord] = {}
 
     # ── Core (required) ──────────────────────────────
 
-    async def insert(self, records: List[MemoryRecord]) -> List[str]:
+    async def insert(self, records: list[MemoryRecord]) -> list[str]:
         """Insert memories into the store. Returns list of inserted IDs.
 
         Raises:
             StorageError: If a record with the same ID already exists.
         """
-        inserted_ids: List[str] = []
+        inserted_ids: list[str] = []
         for record in records:
             if record.id in self._store:
                 raise StorageError(
@@ -58,10 +58,10 @@ class InMemoryAdapter(MemoryStoreAdapter):
 
     async def search_semantic(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Vector cosine similarity search against stored embeddings.
 
         Args:
@@ -73,7 +73,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
             Top-k records sorted by descending cosine similarity.
         """
         candidates = self._apply_filters(filters)
-        scored: List[tuple[float, MemoryRecord]] = []
+        scored: list[tuple[float, MemoryRecord]] = []
 
         for record in candidates:
             if record.embedding is None:
@@ -88,8 +88,8 @@ class InMemoryAdapter(MemoryStoreAdapter):
         self,
         query: str,
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Full-text keyword search using substring and word matching.
 
         Scoring:
@@ -108,7 +108,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
         candidates = self._apply_filters(filters)
         query_lower = query.lower()
         query_words = set(query_lower.split())
-        scored: List[tuple[float, MemoryRecord]] = []
+        scored: list[tuple[float, MemoryRecord]] = []
 
         for record in candidates:
             score = 0.0
@@ -135,7 +135,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
         scored.sort(key=lambda x: x[0], reverse=True)
         return [record for _, record in scored[:top_k]]
 
-    async def update(self, memory_id: str, updates: Dict[str, Any]) -> bool:
+    async def update(self, memory_id: str, updates: dict[str, Any]) -> bool:
         """Partial update a memory record.
 
         Args:
@@ -157,7 +157,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
                 setattr(record, key, value)
         return True
 
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         """Delete memories by ID. Returns count of actually deleted records."""
         deleted = 0
         for mid in memory_ids:
@@ -168,17 +168,17 @@ class InMemoryAdapter(MemoryStoreAdapter):
 
     # ── Extended (recommended) ────────────────────────
 
-    async def get(self, memory_id: str) -> Optional[MemoryRecord]:
+    async def get(self, memory_id: str) -> MemoryRecord | None:
         """Get a single memory by ID. Returns None if not found."""
         return self._store.get(memory_id)
 
-    async def get_batch(self, memory_ids: List[str]) -> List[MemoryRecord]:
+    async def get_batch(self, memory_ids: list[str]) -> list[MemoryRecord]:
         """Get multiple memories by ID. Skips missing IDs."""
         return [self._store[mid] for mid in memory_ids if mid in self._store]
 
     async def list_by_layer(
         self, layer: MemoryLayer, limit: int = 1000, offset: int = 0
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """List all memories in a specific layer with pagination."""
         matches = [r for r in self._store.values() if r.layer == layer]
         # Sort by created_at descending (newest first)
@@ -187,8 +187,8 @@ class InMemoryAdapter(MemoryStoreAdapter):
 
     async def get_stats(self) -> StorageStats:
         """Compute storage statistics."""
-        by_layer: Dict[str, int] = {}
-        by_type: Dict[str, int] = {}
+        by_layer: dict[str, int] = {}
+        by_type: dict[str, int] = {}
 
         for record in self._store.values():
             layer_key = record.layer.value
@@ -205,7 +205,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
             backend_type="memory",
         )
 
-    async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+    async def count(self, filters: dict[str, Any] | None = None) -> int:
         """Count memories matching optional filters."""
         if filters is None:
             return len(self._store)
@@ -213,7 +213,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
 
     # ── Utility ──────────────────────────────────────
 
-    def _apply_filters(self, filters: Optional[Dict[str, Any]]) -> List[MemoryRecord]:
+    def _apply_filters(self, filters: dict[str, Any] | None) -> list[MemoryRecord]:
         """Apply filter dict to the store and return matching records.
 
         Supported filter formats:
@@ -263,7 +263,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
         return candidates
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         """Compute cosine similarity between two vectors."""
         if not a or not b:
             return 0.0
@@ -274,7 +274,7 @@ class InMemoryAdapter(MemoryStoreAdapter):
             a = a[:min_len]
             b = b[:min_len]
 
-        dot = sum(x * y for x, y in zip(a, b))
+        dot = sum(x * y for x, y in zip(a, b))  # noqa: B905
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(y * y for y in b))
 

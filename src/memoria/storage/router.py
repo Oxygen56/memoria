@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from memoria.core.config import MemoriaConfig, StorageBackendConfig
 from memoria.core.exceptions import ConfigurationError
@@ -13,7 +13,7 @@ from memoria.storage.base import MemoryStoreAdapter
 class AdapterRegistry:
     """Registry of available storage adapter types."""
 
-    _adapters: Dict[str, type] = {}
+    _adapters: dict[str, type] = {}
 
     @classmethod
     def register(cls, name: str, adapter_cls: type) -> None:
@@ -65,7 +65,7 @@ class StorageRouter:
 
     def __init__(self, config: MemoriaConfig):
         self._config = config
-        self._backends: Dict[str, MemoryStoreAdapter] = {}
+        self._backends: dict[str, MemoryStoreAdapter] = {}
         self._initialized = False
 
     # ── Initialization ───────────────────────────────
@@ -77,7 +77,7 @@ class StorageRouter:
         # Map layer → backend config
         layer_configs = {
             "hot": self._config.hot_backend,
-            "warm": self._config.warm_backend or StorageBackendConfig(type="lancedb"),
+            "warm": self._config.warm_backend or StorageBackendConfig(type="memory"),
             "cold": self._config.cold_backend,
             "graph": self._config.graph_backend,
         }
@@ -122,9 +122,9 @@ class StorageRouter:
 
     # ── Operations ───────────────────────────────────
 
-    async def insert(self, records: List[MemoryRecord]) -> List[str]:
+    async def insert(self, records: list[MemoryRecord]) -> list[str]:
         """Route inserts to the correct backend(s) based on each record's layer."""
-        by_layer: Dict[MemoryLayer, List[MemoryRecord]] = {}
+        by_layer: dict[MemoryLayer, list[MemoryRecord]] = {}
         for record in records:
             by_layer.setdefault(record.layer, []).append(record)
 
@@ -138,14 +138,14 @@ class StorageRouter:
     async def search_hybrid(
         self,
         query: str,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
         semantic_weight: float = 0.7,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         rrf_k: int = 60,
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """Search across HOT + WARM layers, deduplicate, re-rank."""
-        results: List[MemoryRecord] = []
+        results: list[MemoryRecord] = []
         seen_ids: set = set()
 
         for layer in [MemoryLayer.HOT, MemoryLayer.WARM]:
@@ -188,10 +188,10 @@ class StorageRouter:
 
     async def search_semantic(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Vector similarity search, delegated to warm backend."""
         return await self.warm_backend.search_semantic(query_embedding, top_k, filters)
 
@@ -199,12 +199,12 @@ class StorageRouter:
         self,
         query: str,
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Keyword search, delegated to warm backend."""
         return await self.warm_backend.search_keyword(query, top_k, filters)
 
-    async def get(self, memory_id: str) -> Optional[MemoryRecord]:
+    async def get(self, memory_id: str) -> MemoryRecord | None:
         """Try to find a memory across all layers."""
         for layer in [MemoryLayer.HOT, MemoryLayer.WARM, MemoryLayer.COLD]:
             backend = self._route(layer)
@@ -216,7 +216,7 @@ class StorageRouter:
                 continue
         return None
 
-    async def get_batch(self, memory_ids: List[str]) -> List[MemoryRecord]:
+    async def get_batch(self, memory_ids: list[str]) -> list[MemoryRecord]:
         results = []
         for mid in memory_ids:
             rec = await self.get(mid)
@@ -224,7 +224,7 @@ class StorageRouter:
                 results.append(rec)
         return results
 
-    async def update(self, memory_id: str, updates: Dict[str, Any]) -> bool:
+    async def update(self, memory_id: str, updates: dict[str, Any]) -> bool:
         """Try to update a memory — searches across layers to find it."""
         for layer in [MemoryLayer.HOT, MemoryLayer.WARM, MemoryLayer.COLD]:
             backend = self._route(layer)
@@ -235,7 +235,7 @@ class StorageRouter:
                 continue
         return False
 
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         count = 0
         for layer in [MemoryLayer.HOT, MemoryLayer.WARM, MemoryLayer.COLD]:
             backend = self._route(layer)
@@ -247,11 +247,11 @@ class StorageRouter:
 
     async def list_by_layer(
         self, layer: MemoryLayer, limit: int = 1000, offset: int = 0
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         backend = self._route(layer)
         return await backend.list_by_layer(layer, limit, offset)
 
-    async def get_stats(self) -> Dict[str, StorageStats]:
+    async def get_stats(self) -> dict[str, StorageStats]:
         stats = {}
         for name, backend in self._backends.items():
             try:
@@ -261,7 +261,7 @@ class StorageRouter:
         return stats
 
     async def count(
-        self, filters: Optional[Dict[str, Any]] = None, layer: Optional[MemoryLayer] = None
+        self, filters: dict[str, Any] | None = None, layer: MemoryLayer | None = None
     ) -> int:
         if layer:
             backend = self._route(layer)

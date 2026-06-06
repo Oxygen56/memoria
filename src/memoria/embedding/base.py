@@ -8,7 +8,6 @@ import logging
 import struct
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from typing import Dict, List, Optional
 
 from memoria.core.exceptions import EmbeddingError
 
@@ -22,11 +21,11 @@ class EmbeddingProvider(ABC):
     """Base interface for all embedding providers."""
 
     @abstractmethod
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Generate embedding for a single text."""
         ...
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for multiple texts. Default: sequential calls."""
         return [await self.embed(t) for t in texts]
 
@@ -46,9 +45,12 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
     Requires the `openai` package and a valid OPENAI_API_KEY env variable.
     """
 
-    def __init__(self, model: str = "text-embedding-3-small") -> None:
+    def __init__(
+        self, model: str = "text-embedding-3-small", dimensions: int | None = None
+    ) -> None:
         self._model = model
-        self._client: Optional[object] = None
+        self._dimensions = dimensions
+        self._client: object | None = None
 
     def _get_client(self):
         """Lazy-init the async OpenAI client."""
@@ -63,26 +65,32 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
                 ) from e
         return self._client
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Generate embedding via OpenAI API."""
         client = self._get_client()
-        response = await client.embeddings.create(input=[text], model=self._model)
+        kwargs = {"input": [text], "model": self._model}
+        if self._dimensions is not None:
+            kwargs["dimensions"] = self._dimensions
+        response = await client.embeddings.create(**kwargs)
         return response.data[0].embedding
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Batch embedding via OpenAI API (single call, more efficient)."""
         if not texts:
             return []
         client = self._get_client()
-        response = await client.embeddings.create(input=texts, model=self._model)
+        kwargs = {"input": texts, "model": self._model}
+        if self._dimensions is not None:
+            kwargs["dimensions"] = self._dimensions
+        response = await client.embeddings.create(**kwargs)
         # Response items are sorted by index
         sorted_data = sorted(response.data, key=lambda x: x.index)
         return [item.embedding for item in sorted_data]
 
     @property
     def dimensions(self) -> int:
-        """text-embedding-3-small produces 1536-dimensional vectors."""
-        return 1536
+        """Return configured dimensions or default 1536."""
+        return self._dimensions or 1536
 
 
 # ── Local Provider (sentence-transformers) ────────────
@@ -97,7 +105,7 @@ class LocalEmbeddingProvider(EmbeddingProvider):
 
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:
         self._model_name = model_name
-        self._model: Optional[object] = None
+        self._model: object | None = None
 
     def _get_model(self):
         """Lazy-init the sentence-transformers model."""
@@ -113,25 +121,25 @@ class LocalEmbeddingProvider(EmbeddingProvider):
                 ) from e
         return self._model
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Generate embedding using local model (run in executor to avoid blocking)."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._embed_sync, text)
 
-    def _embed_sync(self, text: str) -> List[float]:
+    def _embed_sync(self, text: str) -> list[float]:
         """Synchronous embedding computation."""
         model = self._get_model()
         embedding = model.encode(text, normalize_embeddings=True)
         return embedding.tolist()
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Batch embedding using local model."""
         if not texts:
             return []
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._embed_batch_sync, texts)
 
-    def _embed_batch_sync(self, texts: List[str]) -> List[List[float]]:
+    def _embed_batch_sync(self, texts: list[str]) -> list[list[float]]:
         """Synchronous batch embedding."""
         model = self._get_model()
         embeddings = model.encode(texts, normalize_embeddings=True)
@@ -156,7 +164,7 @@ class DummyEmbeddingProvider(EmbeddingProvider):
     def __init__(self, dimensions: int = 1536) -> None:
         self._dimensions = dimensions
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Generate a deterministic pseudo-embedding from text hash."""
         digest = hashlib.sha512(text.encode("utf-8")).digest()
         # Extend hash bytes to fill the required dimensions
@@ -198,13 +206,13 @@ class CachedEmbeddingProvider(EmbeddingProvider):
     def __init__(
         self,
         primary: EmbeddingProvider,
-        fallback: Optional[EmbeddingProvider] = None,
+        fallback: EmbeddingProvider | None = None,
         cache_size: int = 10000,
         max_retries: int = 3,
     ) -> None:
         self._primary = primary
         self._fallback = fallback
-        self._cache: OrderedDict[str, List[float]] = OrderedDict()
+        self._cache: OrderedDict[str, list[float]] = OrderedDict()
         self._cache_size = cache_size
         self._max_retries = max_retries
         self._using_fallback = False
@@ -213,7 +221,7 @@ class CachedEmbeddingProvider(EmbeddingProvider):
         """Compute a short hash key for cache lookup."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
-    async def embed(self, text: str) -> List[float]:
+    async def embed(self, text: str) -> list[float]:
         """Embed with cache check, retry, and fallback."""
         key = self._cache_key(text)
 
@@ -232,11 +240,11 @@ class CachedEmbeddingProvider(EmbeddingProvider):
         self._cache[key] = result
         return result
 
-    async def embed_batch(self, texts: List[str]) -> List[List[float]]:
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Batch embed with per-item caching."""
-        results: List[List[float]] = []
-        uncached_indices: List[int] = []
-        uncached_texts: List[str] = []
+        results: list[list[float]] = []
+        uncached_indices: list[int] = []
+        uncached_texts: list[str] = []
 
         # Separate cached vs uncached
         for i, text in enumerate(texts):
@@ -260,7 +268,7 @@ class CachedEmbeddingProvider(EmbeddingProvider):
                     await self._embed_with_retry(t) for t in uncached_texts
                 ]
 
-            for idx, emb in zip(uncached_indices, new_embeddings):
+            for idx, emb in zip(uncached_indices, new_embeddings):  # noqa: B905
                 results[idx] = emb
                 key = self._cache_key(texts[idx])
                 if len(self._cache) >= self._cache_size:
@@ -269,10 +277,10 @@ class CachedEmbeddingProvider(EmbeddingProvider):
 
         return results
 
-    async def _embed_with_retry(self, text: str) -> List[float]:
+    async def _embed_with_retry(self, text: str) -> list[float]:
         """Attempt embedding with exponential backoff retry and fallback."""
         provider = self._fallback if self._using_fallback else self._primary
-        last_error: Optional[Exception] = None
+        last_error: Exception | None = None
 
         for attempt in range(self._max_retries):
             try:
@@ -317,7 +325,7 @@ class CachedEmbeddingProvider(EmbeddingProvider):
         return self._primary.dimensions
 
     @property
-    def cache_stats(self) -> Dict[str, int]:
+    def cache_stats(self) -> dict[str, int]:
         """Return cache statistics for monitoring."""
         return {
             "size": len(self._cache),

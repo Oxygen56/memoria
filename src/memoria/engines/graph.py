@@ -7,12 +7,10 @@ and enables graph-based queries like causal chains and multi-hop reasoning.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
-import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
 
 import networkx as nx
 
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # ── Known technology words for entity extraction ──────────────────────────────
 
-_KNOWN_TECH_WORDS: Set[str] = {
+_KNOWN_TECH_WORDS: set[str] = {
     "python", "javascript", "typescript", "rust", "go", "java", "kotlin", "swift",
     "ruby", "php", "scala", "elixir", "haskell", "clojure", "lua", "perl",
     "docker", "kubernetes", "redis", "nginx", "apache", "postgres", "postgresql",
@@ -36,7 +34,7 @@ _KNOWN_TECH_WORDS: Set[str] = {
     "graphql", "grpc", "rest", "websocket", "http", "https",
     "pytest", "jest", "mocha", "cypress", "selenium",
     "numpy", "pandas", "scipy", "pytorch", "tensorflow", "keras",
-    "pydantic", "sqlalchemy", "alembic", "celery", "dramatiq",
+    "pydantic", "sqlalchemy", "alembic", "dramatiq",
     "networkx", "lancedb", "qdrant", "neo4j", "prometheus", "grafana",
     "npm", "yarn", "pip", "conda", "homebrew", "cargo", "maven", "gradle",
     "vscode", "vim", "neovim", "emacs", "intellij", "pycharm",
@@ -45,7 +43,7 @@ _KNOWN_TECH_WORDS: Set[str] = {
 
 # ── Uppercase abbreviation services ──────────────────────────────────────────
 
-_SERVICE_ABBREVIATIONS: Set[str] = {
+_SERVICE_ABBREVIATIONS: set[str] = {
     "API", "SQL", "AWS", "GCP", "CLI", "SDK", "CDN", "DNS", "SSH", "TLS",
     "SSL", "JWT", "OAuth", "CORS", "CRUD", "ORM", "MVC", "MVP", "CI", "CD",
     "GPU", "CPU", "RAM", "SSD", "HDD", "LLM", "RAG", "NLP", "ML", "AI",
@@ -56,7 +54,7 @@ _SERVICE_ABBREVIATIONS: Set[str] = {
 
 # ── Relation extraction patterns ─────────────────────────────────────────────
 
-_RELATION_PATTERNS: List[Tuple[str, str]] = [
+_RELATION_PATTERNS: list[tuple[str, str]] = [
     (r"\buses(?:s|d)?\b|\busing\b", "uses"),
     (r"\bdepends?\s+on\b|\brequires?\b|\bneeds?\b", "depends_on"),
     (r"\bprefers?\b|\bchose\b|\bselected?\b|\bpicked?\b", "prefers"),
@@ -77,7 +75,7 @@ class Entity:
     id: str = field(default_factory=lambda: f"ent_{uuid.uuid4().hex[:8]}")
     name: str = ""
     entity_type: str = "unknown"  # person, technology, concept, tool, service, etc.
-    memory_ids: List[str] = field(default_factory=list)  # memories mentioning this entity
+    memory_ids: list[str] = field(default_factory=list)  # memories mentioning this entity
 
 
 @dataclass
@@ -96,10 +94,10 @@ class Relation:
 class GraphQueryResult:
     """Result of a graph query."""
 
-    entities: List[Entity] = field(default_factory=list)
-    relations: List[Relation] = field(default_factory=list)
-    related_memory_ids: List[str] = field(default_factory=list)
-    paths: List[List[str]] = field(default_factory=list)  # paths of entity IDs
+    entities: list[Entity] = field(default_factory=list)
+    relations: list[Relation] = field(default_factory=list)
+    related_memory_ids: list[str] = field(default_factory=list)
+    paths: list[list[str]] = field(default_factory=list)  # paths of entity IDs
 
 
 class GraphEngine:
@@ -111,17 +109,17 @@ class GraphEngine:
     and related-memory discovery.
     """
 
-    def __init__(self, config: Optional[GraphConfig] = None) -> None:
+    def __init__(self, config: GraphConfig | None = None) -> None:
         self._config = config or GraphConfig()
         self._graph = nx.DiGraph()
-        self._entities: Dict[str, Entity] = {}  # entity_id → Entity
-        self._entity_name_index: Dict[str, str] = {}  # normalized_name → entity_id
-        self._relations: Dict[str, Relation] = {}  # relation_id → Relation
-        self._memory_entities: Dict[str, List[str]] = {}  # memory_id → [entity_ids]
+        self._entities: dict[str, Entity] = {}  # entity_id → Entity
+        self._entity_name_index: dict[str, str] = {}  # normalized_name → entity_id
+        self._relations: dict[str, Relation] = {}  # relation_id → Relation
+        self._memory_entities: dict[str, list[str]] = {}  # memory_id → [entity_ids]
 
     # ── Core API ──────────────────────────────────────────────────────────────
 
-    async def build_relations(self, memory: MemoryRecord) -> List[Relation]:
+    async def build_relations(self, memory: MemoryRecord) -> list[Relation]:
         """Extract entities and relations from a memory, update the graph.
 
         Args:
@@ -137,7 +135,7 @@ class GraphEngine:
         entities = self._extract_entities(text, memory.memory_type)
 
         # Link entities to the memory
-        entity_ids: List[str] = []
+        entity_ids: list[str] = []
         for ent in entities:
             existing = self._get_or_create_entity(ent.name, ent.entity_type)
             if memory_id not in existing.memory_ids:
@@ -193,13 +191,13 @@ class GraphEngine:
             return result
 
         # BFS traversal up to `hops` distance
-        visited: Set[str] = set()
-        frontier: Set[str] = {entity.id}
-        all_paths: List[List[str]] = [[entity.id]]
+        visited: set[str] = set()
+        frontier: set[str] = {entity.id}
+        all_paths: list[list[str]] = [[entity.id]]
 
         for _ in range(hops):
-            next_frontier: Set[str] = set()
-            new_paths: List[List[str]] = []
+            next_frontier: set[str] = set()
+            new_paths: list[list[str]] = []
 
             for node_id in frontier:
                 if node_id in visited:
@@ -229,7 +227,7 @@ class GraphEngine:
         visited.update(frontier)
 
         # Collect results
-        memory_ids_set: Set[str] = set()
+        memory_ids_set: set[str] = set()
         for eid in visited:
             if eid in self._entities:
                 ent = self._entities[eid]
@@ -245,7 +243,7 @@ class GraphEngine:
         result.paths = [p for p in all_paths if len(p) > 1]
         return result
 
-    async def get_related_memories(self, memory_id: str, max_hops: int = 2) -> List[str]:
+    async def get_related_memories(self, memory_id: str, max_hops: int = 2) -> list[str]:
         """Get IDs of memories related through the graph.
 
         Args:
@@ -259,18 +257,18 @@ class GraphEngine:
         if not entity_ids:
             return []
 
-        related_memory_ids: Set[str] = set()
+        related_memory_ids: set[str] = set()
 
         for eid in entity_ids:
             if not self._graph.has_node(eid):
                 continue
 
             # BFS from this entity up to max_hops
-            visited: Set[str] = set()
-            frontier: Set[str] = {eid}
+            visited: set[str] = set()
+            frontier: set[str] = {eid}
 
             for _ in range(max_hops):
-                next_frontier: Set[str] = set()
+                next_frontier: set[str] = set()
                 for node in frontier:
                     if node in visited:
                         continue
@@ -295,7 +293,7 @@ class GraphEngine:
         related_memory_ids.discard(memory_id)
         return list(related_memory_ids)
 
-    async def get_causal_chain(self, memory_id: str) -> List[str]:
+    async def get_causal_chain(self, memory_id: str) -> list[str]:
         """Reconstruct a causal chain of decisions/events for a memory.
 
         Follows edges backward (predecessors) from entities associated with
@@ -316,8 +314,8 @@ class GraphEngine:
         # Causal relation types
         causal_types = {"depends_on", "replaces", "decision_for", "created", "requires"}
 
-        antecedent_mids: List[str] = []
-        consequence_mids: List[str] = []
+        antecedent_mids: list[str] = []
+        consequence_mids: list[str] = []
 
         for eid in entity_ids:
             if not self._graph.has_node(eid):
@@ -342,10 +340,10 @@ class GraphEngine:
                                 consequence_mids.append(mid)
 
         # Chain: antecedents → source → consequences
-        chain: List[str] = antecedent_mids + [memory_id] + consequence_mids
+        chain: list[str] = antecedent_mids + [memory_id] + consequence_mids
         return chain
 
-    def get_entity(self, entity_name: str) -> Optional[Entity]:
+    def get_entity(self, entity_name: str) -> Entity | None:
         """Look up an entity by name.
 
         Args:
@@ -360,7 +358,7 @@ class GraphEngine:
             return None
         return self._entities.get(entity_id)
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Return graph statistics.
 
         Returns:
@@ -379,7 +377,7 @@ class GraphEngine:
 
     # ── Entity/Relation Extraction ────────────────────────────────────────────
 
-    def _extract_entities(self, text: str, memory_type: MemoryType) -> List[Entity]:
+    def _extract_entities(self, text: str, memory_type: MemoryType) -> list[Entity]:
         """Extract entities from text using regex patterns.
 
         Patterns detected:
@@ -397,8 +395,8 @@ class GraphEngine:
         Returns:
             List of extracted Entity objects (may contain duplicates by name).
         """
-        entities: List[Entity] = []
-        seen_names: Set[str] = set()
+        entities: list[Entity] = []
+        seen_names: set[str] = set()
 
         def _add(name: str, etype: str) -> None:
             normalized = self._normalize_entity_name(name)
@@ -445,8 +443,8 @@ class GraphEngine:
         return entities
 
     def _extract_relations(
-        self, text: str, entities: List[Entity], memory_id: str
-    ) -> List[Relation]:
+        self, text: str, entities: list[Entity], memory_id: str
+    ) -> list[Relation]:
         """Extract relationships between entities from text.
 
         Uses pattern matching to detect relation types between entities
@@ -472,7 +470,7 @@ class GraphEngine:
         if len(entities) < 2:
             return []
 
-        relations: List[Relation] = []
+        relations: list[Relation] = []
         text_lower = text.lower()
 
         # For each pair of entities, check if a relation pattern exists
@@ -555,7 +553,7 @@ class GraphEngine:
 
     # ── Graph Operations ──────────────────────────────────────────────────────
 
-    def _add_to_graph(self, entities: List[Entity], relations: List[Relation]) -> None:
+    def _add_to_graph(self, entities: list[Entity], relations: list[Relation]) -> None:
         """Add entities and relations to the NetworkX graph.
 
         Entities become nodes (with attributes), relations become directed edges.
@@ -615,7 +613,10 @@ class GraphEngine:
         }
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info("Graph persisted to %s (%d entities, %d relations)", path, len(self._entities), len(self._relations))
+        logger.info(
+            "Graph persisted to %s (%d entities, %d relations)",
+            path, len(self._entities), len(self._relations),
+        )
 
     async def load(self, path: str) -> None:
         """Load graph from a persisted JSON file.
@@ -626,7 +627,7 @@ class GraphEngine:
         Args:
             path: File path to load the serialized graph data from.
         """
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Clear current state

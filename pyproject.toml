@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "memoria-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Production-grade memory infrastructure for AI agents — storage-agnostic, self-evolving, observable."
 readme = "README.md"
 license = {text = "MIT"}
@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-lancedb = ["lancedb>=0.17", "tantivy>=0.22", "numpy>=1.24", "pyarrow>=12.0"]
+lancedb = ["lancedb>=0.17", "numpy>=1.24", "pyarrow>=12.0"]
 qdrant = ["qdrant-client>=1.9"]
 pgvector = ["asyncpg>=0.29", "pgvector>=0.3"]
 elasticsearch = ["elasticsearch[async]>=8.0"]
@@ -57,17 +57,14 @@ all = [
 memoria = "memoria.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/memoria/memoria"
+Homepage = "https://github.com/Oxygen56/memoria"
 Documentation = "https://memoria.dev"
-Repository = "https://github.com/memoria/memoria"
-Issues = "https://github.com/memoria/memoria/issues"
+Repository = "https://github.com/Oxygen56/memoria"
+Issues = "https://github.com/Oxygen56/memoria/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/memoria"]
 only-include = ["src/memoria"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"dashboard/build" = "memoria/dashboard_static"
 
 [tool.ruff]
 line-length = 100

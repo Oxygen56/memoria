@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -35,7 +35,7 @@ class DecayConfig:
     decay_cycle_interval_hours: int = 6
     consolidate_before_deletion: bool = True
     max_memories_per_cycle: int = 10000
-    custom_half_lives: Dict[str, float] = field(default_factory=dict)
+    custom_half_lives: dict[str, float] = field(default_factory=dict)
     auto_promote_to_hot_threshold: float = 0.85
 
     # Layer thresholds
@@ -74,8 +74,8 @@ class GraphConfig:
 class StorageBackendConfig:
     """Configuration for a single storage backend."""
 
-    type: str = "lancedb"
-    params: Dict[str, Any] = field(default_factory=dict)
+    type: str = "memory"
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -83,10 +83,10 @@ class MemoriaConfig:
     """Master configuration for Memoria."""
 
     # Storage
-    warm_backend: Optional[StorageBackendConfig] = None
-    hot_backend: Optional[StorageBackendConfig] = None
-    cold_backend: Optional[StorageBackendConfig] = None
-    graph_backend: Optional[StorageBackendConfig] = None
+    warm_backend: StorageBackendConfig | None = None
+    hot_backend: StorageBackendConfig | None = None
+    cold_backend: StorageBackendConfig | None = None
+    graph_backend: StorageBackendConfig | None = None
 
     # Embedding
     embedding_provider: str = "openai"
@@ -106,10 +106,10 @@ class MemoriaConfig:
     data_dir: str = "~/.memoria"
 
     @classmethod
-    def default(cls) -> "MemoriaConfig":
+    def default(cls) -> MemoriaConfig:
         return cls(
             warm_backend=StorageBackendConfig(
-                type="lancedb",
-                params={"path": "~/.memoria/data"},
+                type="memory",
+                params={},
             ),
         )

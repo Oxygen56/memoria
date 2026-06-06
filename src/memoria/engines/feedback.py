@@ -12,7 +12,6 @@ from __future__ import annotations
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
 
 from memoria.core.config import FeedbackConfig
 from memoria.core.models import (
@@ -30,8 +29,8 @@ class UsageTracker:
     """Tracks which memories are accessed and in what context (in-memory only)."""
 
     def __init__(self):
-        self._access_log: Dict[str, List[datetime]] = defaultdict(list)
-        self._context_map: Dict[str, List[str]] = defaultdict(list)
+        self._access_log: dict[str, list[datetime]] = defaultdict(list)
+        self._context_map: dict[str, list[str]] = defaultdict(list)
 
     def record_access(self, memory_id: str, context: str) -> None:
         now = datetime.now(timezone.utc)
@@ -41,13 +40,13 @@ class UsageTracker:
     def get_access_count(self, memory_id: str) -> int:
         return len(self._access_log.get(memory_id, []))
 
-    def get_last_access(self, memory_id: str) -> Optional[datetime]:
+    def get_last_access(self, memory_id: str) -> datetime | None:
         accesses = self._access_log.get(memory_id, [])
         return accesses[-1] if accesses else None
 
     def get_recent_contexts(
         self, memory_id: str, limit: int = 5
-    ) -> List[str]:
+    ) -> list[str]:
         return self._context_map.get(memory_id, [])[-limit:]
 
 
@@ -64,13 +63,13 @@ class PersistentUsageTracker(UsageTracker):
     def __init__(self, storage: MemoryStoreAdapter):
         super().__init__()
         self._storage = storage
-        self._buffer: List[MemoryAccessLog] = []
+        self._buffer: list[MemoryAccessLog] = []
 
     def record_access(
         self,
         memory_id: str,
         context: str,
-        session_id: Optional[str] = None,
+        session_id: str | None = None,
         trigger: str = "awareness",
     ) -> None:
         """Record an access event in both in-memory log and persistent buffer."""
@@ -106,7 +105,7 @@ class PersistentUsageTracker(UsageTracker):
             return 0
 
         # Group buffer entries by memory_id for batch update
-        updates_by_id: Dict[str, List[MemoryAccessLog]] = defaultdict(list)
+        updates_by_id: dict[str, list[MemoryAccessLog]] = defaultdict(list)
         for entry in self._buffer:
             updates_by_id[entry.memory_id].append(entry)
 
@@ -146,14 +145,14 @@ class FeedbackEngine:
     def __init__(
         self,
         storage: MemoryStoreAdapter,
-        config: Optional[FeedbackConfig] = None,
+        config: FeedbackConfig | None = None,
     ):
         self._storage = storage
         self._config = config or FeedbackConfig()
         self._usage = PersistentUsageTracker(storage)
 
     # Alias for event bus (set externally)
-    event_bus: Optional[object] = None
+    event_bus: object | None = None
 
     # ── Core Feedback Methods ───────────────────────
 
@@ -225,7 +224,7 @@ class FeedbackEngine:
 
     async def detect_contradictions(
         self, new_memory: MemoryRecord
-    ) -> List[Contradiction]:
+    ) -> list[Contradiction]:
         """
         Detect if a new memory contradicts existing ones.
 
@@ -246,7 +245,7 @@ class FeedbackEngine:
             else []
         )
 
-        contradictions: List[Contradiction] = []
+        contradictions: list[Contradiction] = []
         for existing in similar:
             if existing.id == new_memory.id:
                 continue
@@ -336,7 +335,7 @@ class FeedbackEngine:
         if self.event_bus and hasattr(self.event_bus, "emit"):
             await self.event_bus.emit(event)
 
-    def get_usage_stats(self, memory_id: str) -> Dict:
+    def get_usage_stats(self, memory_id: str) -> dict:
         """Get usage statistics for a specific memory."""
         return {
             "access_count": self._usage.get_access_count(memory_id),

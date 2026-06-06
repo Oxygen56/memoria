@@ -2,9 +2,9 @@
 
 import pytest
 
-from memoria.engines.graph import GraphEngine, Entity, Relation, GraphQueryResult
-from memoria.core.models import MemoryRecord, MemoryType
 from memoria.core.config import GraphConfig
+from memoria.core.models import MemoryRecord, MemoryType
+from memoria.engines.graph import GraphEngine, GraphQueryResult
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ class TestEntityExtraction:
             content="We use PostgreSQL 16 for production",
             memory_type=MemoryType.FACT,
         )
-        relations = await graph_engine.build_relations(record)
+        await graph_engine.build_relations(record)
 
         stats = graph_engine.get_stats()
         assert stats["entity_count"] > 0

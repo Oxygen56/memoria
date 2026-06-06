@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any
 
 from memoria.core.config import (
     AwarenessConfig,
@@ -44,6 +44,7 @@ from memoria.embedding.base import EmbeddingProvider, OpenAIEmbeddingProvider
 from memoria.engines.awareness import AwarenessEngine
 from memoria.engines.decay import DecayEngine
 from memoria.engines.feedback import FeedbackEngine
+from memoria.engines.graph import GraphEngine
 from memoria.engines.orchestrator import EngineOrchestrator
 from memoria.storage.base import MemoryStoreAdapter
 from memoria.storage.router import StorageRouter
@@ -65,22 +66,22 @@ class Memoria:
     def __init__(
         self,
         # Storage configuration
-        warm_backend: Optional[Union[str, MemoryStoreAdapter]] = None,
-        hot_backend: Optional[Union[str, MemoryStoreAdapter]] = None,
-        cold_backend: Optional[Union[str, MemoryStoreAdapter]] = None,
-        graph_backend: Optional[Union[str, MemoryStoreAdapter]] = None,
+        warm_backend: str | MemoryStoreAdapter | None = None,
+        hot_backend: str | MemoryStoreAdapter | None = None,
+        cold_backend: str | MemoryStoreAdapter | None = None,
+        graph_backend: str | MemoryStoreAdapter | None = None,
         # Embedding
-        embedding: Optional[Union[str, EmbeddingProvider]] = None,
+        embedding: str | EmbeddingProvider | None = None,
         embedding_model: str = "text-embedding-3-small",
-        embedding_dimensions: Optional[int] = None,
+        embedding_dimensions: int | None = None,
         # Engine configs
-        awareness_config: Optional[AwarenessConfig] = None,
-        decay_config: Optional[DecayConfig] = None,
-        feedback_config: Optional[FeedbackConfig] = None,
-        graph_config: Optional[GraphConfig] = None,
+        awareness_config: AwarenessConfig | None = None,
+        decay_config: DecayConfig | None = None,
+        feedback_config: FeedbackConfig | None = None,
+        graph_config: GraphConfig | None = None,
         # Convenience
-        config: Optional[MemoriaConfig] = None,
-        config_path: Optional[str] = None,
+        config: MemoriaConfig | None = None,
+        config_path: str | None = None,
         data_dir: str = "~/.memoria",
     ):
         # Build or load configuration
@@ -120,13 +121,13 @@ class Memoria:
             )
 
         # Engines (initialized after storage is ready)
-        self._awareness: Optional[AwarenessEngine] = None
-        self._decay: Optional[DecayEngine] = None
-        self._feedback: Optional[FeedbackEngine] = None
-        self._graph: Optional["GraphEngine"] = None
-        self._orchestrator: Optional[EngineOrchestrator] = None
+        self._awareness: AwarenessEngine | None = None
+        self._decay: DecayEngine | None = None
+        self._feedback: FeedbackEngine | None = None
+        self._graph: GraphEngine | None = None
+        self._orchestrator: EngineOrchestrator | None = None
 
-        self._started_at: Optional[datetime] = None
+        self._started_at: datetime | None = None
 
     # ── Lifecycle ────────────────────────────────────
 
@@ -165,7 +166,7 @@ class Memoria:
         """Gracefully close all connections."""
         self._started_at = None
 
-    async def __aenter__(self) -> "Memoria":
+    async def __aenter__(self) -> Memoria:
         await self.initialize()
         return self
 
@@ -177,13 +178,13 @@ class Memoria:
     async def remember(
         self,
         content: str,
-        memory_type: Union[MemoryType, str] = MemoryType.FACT,
+        memory_type: MemoryType | str = MemoryType.FACT,
         importance: float = 0.5,
-        tags: Optional[List[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        related_to: Optional[List[str]] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
+        tags: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+        related_to: list[str] | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
     ) -> MemoryRecord:
         """
         Store a new memory.
@@ -245,7 +246,7 @@ class Memoria:
         self,
         input_text: str,
         token_budget: int = 200,
-        context_window: Optional[List[str]] = None,
+        context_window: list[str] | None = None,
     ) -> ContextInjection:
         """
         Proactively recall relevant memories for the current conversation turn.
@@ -285,9 +286,9 @@ class Memoria:
         self,
         query: str,
         top_k: int = 10,
-        memory_type: Optional[Union[MemoryType, str]] = None,
-        tags: Optional[List[str]] = None,
-    ) -> List[MemoryRecord]:
+        memory_type: MemoryType | str | None = None,
+        tags: list[str] | None = None,
+    ) -> list[MemoryRecord]:
         """
         Explicit memory search — when the agent knows what it's looking for.
 
@@ -304,9 +305,11 @@ class Memoria:
         """
         query_embedding = await self._embedding.embed(query)
 
-        filters: Dict[str, Any] = {}
+        filters: dict[str, Any] = {}
         if memory_type:
-            filters["memory_type"] = memory_type.value if isinstance(memory_type, MemoryType) else memory_type
+            filters["memory_type"] = (
+                memory_type.value if isinstance(memory_type, MemoryType) else memory_type
+            )
 
         results = await self._storage.search_hybrid(
             query=query,
@@ -335,14 +338,14 @@ class Memoria:
     async def edit(
         self,
         memory_id: str,
-        content: Optional[str] = None,
-        importance: Optional[float] = None,
-        memory_type: Optional[Union[MemoryType, str]] = None,
-        tags: Optional[List[str]] = None,
+        content: str | None = None,
+        importance: float | None = None,
+        memory_type: MemoryType | str | None = None,
+        tags: list[str] | None = None,
         **kwargs: Any,
     ) -> bool:
         """Manually edit a memory's fields."""
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
         if content is not None:
             updates["content"] = content
             # Re-embed if content changed
@@ -385,17 +388,17 @@ class Memoria:
             uptime_seconds=uptime,
         )
 
-    async def get_memory(self, memory_id: str) -> Optional[MemoryRecord]:
+    async def get_memory(self, memory_id: str) -> MemoryRecord | None:
         """Get a single memory by ID."""
         return await self._storage.get(memory_id)
 
     async def list_memories(
         self,
-        layer: Optional[Union[MemoryLayer, str]] = None,
-        memory_type: Optional[Union[MemoryType, str]] = None,
+        layer: MemoryLayer | str | None = None,
+        memory_type: MemoryType | str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """List memories with optional filtering."""
         if layer:
             if isinstance(layer, str):
@@ -404,7 +407,7 @@ class Memoria:
         # Without layer, search across warm layer
         return await self._storage.list_by_layer(MemoryLayer.WARM, limit, offset)
 
-    async def search_by_tag(self, tag: str, limit: int = 20) -> List[MemoryRecord]:
+    async def search_by_tag(self, tag: str, limit: int = 20) -> list[MemoryRecord]:
         """Find all memories with a specific tag."""
         # Simple approach: use keyword search on the tag
         return await self._storage.search_keyword(query=tag, top_k=limit)
@@ -416,7 +419,7 @@ class Memoria:
     async def report_usage(
         self,
         context_injection: ContextInjection,
-        used_memory_ids: Optional[List[str]] = None,
+        used_memory_ids: list[str] | None = None,
     ) -> None:
         """
         Report which memories from the last recall were actually used by the agent.
@@ -434,7 +437,7 @@ class Memoria:
             return
 
         # Collect all injected memory IDs
-        all_injected_ids: Set[str] = set()
+        all_injected_ids: set[str] = set()
         for item in context_injection.relevant:
             all_injected_ids.add(item.memory.id)
         for mem in context_injection.hot:
@@ -463,13 +466,13 @@ class Memoria:
             return None
         return await self._graph.query_graph(entity_name, hops)
 
-    async def get_related_memories(self, memory_id: str, max_hops: int = 2) -> List[str]:
+    async def get_related_memories(self, memory_id: str, max_hops: int = 2) -> list[str]:
         """Get memory IDs related through the knowledge graph."""
         if self._graph is None:
             return []
         return await self._graph.get_related_memories(memory_id, max_hops)
 
-    async def get_contradictions(self) -> List[Contradiction]:
+    async def get_contradictions(self) -> list[Contradiction]:
         """Get all flagged contradictions for manual review."""
         # Find memories with contradiction_of set
         results = []
@@ -522,15 +525,15 @@ class Memoria:
         hot_backend: Any = None,
         cold_backend: Any = None,
         graph_backend: Any = None,
-        awareness_config: Optional[AwarenessConfig] = None,
-        decay_config: Optional[DecayConfig] = None,
-        feedback_config: Optional[FeedbackConfig] = None,
-        graph_config: Optional[GraphConfig] = None,
+        awareness_config: AwarenessConfig | None = None,
+        decay_config: DecayConfig | None = None,
+        feedback_config: FeedbackConfig | None = None,
+        graph_config: GraphConfig | None = None,
         data_dir: str = "~/.memoria",
     ) -> MemoriaConfig:
         """Build MemoriaConfig from constructor arguments."""
 
-        def _to_backend_config(backend: Any) -> Optional[StorageBackendConfig]:
+        def _to_backend_config(backend: Any) -> StorageBackendConfig | None:
             if backend is None:
                 return None
             if isinstance(backend, MemoryStoreAdapter):

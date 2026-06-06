@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from memoria.core.models import MemoryLayer, MemoryRecord, MemoryType, StorageStats
 from memoria.storage.base import MemoryStoreAdapter
@@ -162,12 +162,12 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
     # ── Core methods ──────────────────────────────────
 
-    async def insert(self, records: List[MemoryRecord]) -> List[str]:
+    async def insert(self, records: list[MemoryRecord]) -> list[str]:
         """Batch insert memories with ON CONFLICT DO NOTHING."""
         if not records:
             return []
 
-        inserted_ids: List[str] = []
+        inserted_ids: list[str] = []
         async with self._pool.acquire() as conn:  # type: ignore[union-attr]
             for record in records:
                 row = self._record_to_row(record)
@@ -200,10 +200,10 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
     async def search_semantic(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Vector similarity search using pgvector cosine distance."""
         filter_clause, params = self._build_filter_clause(filters)
         param_idx = len(params) + 1
@@ -228,15 +228,18 @@ class PgVectorAdapter(MemoryStoreAdapter):
         self,
         query: str,
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Full-text search using PostgreSQL ts_vector."""
         filter_clause, params = self._build_filter_clause(filters)
         param_idx = len(params) + 1
 
         sql = f"""
             SELECT *,
-                   ts_rank(to_tsvector('english', content), plainto_tsquery('english', ${param_idx})) as rank
+                   ts_rank(
+                       to_tsvector('english', content),
+                       plainto_tsquery('english', ${param_idx})
+                   ) as rank
             FROM {self._table_name}
             WHERE to_tsvector('english', content) @@ plainto_tsquery('english', ${param_idx})
                   {filter_clause}
@@ -250,13 +253,13 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
         return [self._row_to_record(row) for row in rows]
 
-    async def update(self, memory_id: str, updates: Dict[str, Any]) -> bool:
+    async def update(self, memory_id: str, updates: dict[str, Any]) -> bool:
         """Partial update using dynamic SET clause."""
         if not updates:
             return False
 
-        set_parts: List[str] = []
-        params: List[Any] = []
+        set_parts: list[str] = []
+        params: list[Any] = []
         idx = 1
 
         for key, value in updates.items():
@@ -292,7 +295,7 @@ class PgVectorAdapter(MemoryStoreAdapter):
             result = await conn.execute(sql, *params)
             return result != "UPDATE 0"
 
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         """Batch delete by IDs."""
         if not memory_ids:
             return 0
@@ -307,7 +310,7 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
     # ── Extended methods ──────────────────────────────
 
-    async def get(self, memory_id: str) -> Optional[MemoryRecord]:
+    async def get(self, memory_id: str) -> MemoryRecord | None:
         """Get a single memory by ID."""
         sql = f"SELECT * FROM {self._table_name} WHERE id = $1"
 
@@ -320,7 +323,7 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
     async def list_by_layer(
         self, layer: MemoryLayer, limit: int = 1000, offset: int = 0
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """List memories in a specific layer."""
         sql = f"""
             SELECT * FROM {self._table_name}
@@ -361,7 +364,7 @@ class PgVectorAdapter(MemoryStoreAdapter):
             backend_type="pgvector",
         )
 
-    async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+    async def count(self, filters: dict[str, Any] | None = None) -> int:
         """Count memories matching filters."""
         filter_clause, params = self._build_filter_clause(filters)
         sql = f"SELECT COUNT(*) FROM {self._table_name} WHERE 1=1 {filter_clause}"
@@ -373,9 +376,9 @@ class PgVectorAdapter(MemoryStoreAdapter):
 
     # ── Helpers ───────────────────────────────────────
 
-    def _record_to_row(self, record: MemoryRecord) -> Dict[str, Any]:
+    def _record_to_row(self, record: MemoryRecord) -> dict[str, Any]:
         """Convert MemoryRecord to DB row dict."""
-        embedding_str: Optional[str] = None
+        embedding_str: str | None = None
         if record.embedding:
             embedding_str = "[" + ",".join(str(v) for v in record.embedding) + "]"
 
@@ -454,8 +457,8 @@ class PgVectorAdapter(MemoryStoreAdapter):
         )
 
     def _build_filter_clause(
-        self, filters: Optional[Dict[str, Any]]
-    ) -> Tuple[str, List[Any]]:
+        self, filters: dict[str, Any] | None
+    ) -> tuple[str, list[Any]]:
         """Build WHERE clause from filters dict. Returns (clause_str, params).
 
         Supports:
@@ -466,8 +469,8 @@ class PgVectorAdapter(MemoryStoreAdapter):
         if not filters:
             return "", []
 
-        clauses: List[str] = []
-        params: List[Any] = []
+        clauses: list[str] = []
+        params: list[Any] = []
         idx = 1
 
         for key, value in filters.items():

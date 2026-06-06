@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from memoria.core.models import MemoryLayer, MemoryRecord, StorageStats
 
@@ -19,17 +19,17 @@ class MemoryStoreAdapter(ABC):
     # ── Core (required) ──────────────────────────────
 
     @abstractmethod
-    async def insert(self, records: List[MemoryRecord]) -> List[str]:
+    async def insert(self, records: list[MemoryRecord]) -> list[str]:
         """Insert memories. Returns list of inserted IDs."""
         ...
 
     @abstractmethod
     async def search_semantic(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Vector similarity search. `query_embedding` is pre-computed by the caller."""
         ...
 
@@ -38,18 +38,18 @@ class MemoryStoreAdapter(ABC):
         self,
         query: str,
         top_k: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[MemoryRecord]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[MemoryRecord]:
         """Full-text / keyword search."""
         ...
 
     @abstractmethod
-    async def update(self, memory_id: str, updates: Dict[str, Any]) -> bool:
+    async def update(self, memory_id: str, updates: dict[str, Any]) -> bool:
         """Partial update a memory. Returns True if successful."""
         ...
 
     @abstractmethod
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         """Delete memories. Returns count deleted."""
         ...
 
@@ -58,12 +58,12 @@ class MemoryStoreAdapter(ABC):
     async def search_hybrid(
         self,
         query: str,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
         semantic_weight: float = 0.7,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         rrf_k: int = 60,
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """Hybrid semantic + keyword search with RRF fusion.
 
         Args:
@@ -78,11 +78,11 @@ class MemoryStoreAdapter(ABC):
         keyword_results = await self.search_keyword(query, top_k * 2, filters)
         return self._rrf_fusion(semantic_results, keyword_results, top_k, k=rrf_k)
 
-    async def get(self, memory_id: str) -> Optional[MemoryRecord]:
+    async def get(self, memory_id: str) -> MemoryRecord | None:
         """Get a single memory by ID."""
         raise NotImplementedError
 
-    async def get_batch(self, memory_ids: List[str]) -> List[MemoryRecord]:
+    async def get_batch(self, memory_ids: list[str]) -> list[MemoryRecord]:
         """Get multiple memories by ID."""
         results = []
         for mid in memory_ids:
@@ -93,7 +93,7 @@ class MemoryStoreAdapter(ABC):
 
     async def list_by_layer(
         self, layer: MemoryLayer, limit: int = 1000, offset: int = 0
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """List memories in a specific layer."""
         raise NotImplementedError
 
@@ -101,7 +101,7 @@ class MemoryStoreAdapter(ABC):
         """Storage statistics."""
         raise NotImplementedError
 
-    async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+    async def count(self, filters: dict[str, Any] | None = None) -> int:
         """Count memories matching filters."""
         raise NotImplementedError
 
@@ -109,14 +109,14 @@ class MemoryStoreAdapter(ABC):
 
     @staticmethod
     def _rrf_fusion(
-        list_a: List[MemoryRecord],
-        list_b: List[MemoryRecord],
+        list_a: list[MemoryRecord],
+        list_b: list[MemoryRecord],
         top_k: int,
         k: int = 60,
-    ) -> List[MemoryRecord]:
+    ) -> list[MemoryRecord]:
         """Reciprocal Rank Fusion — combines two ranked lists."""
-        scores: Dict[str, float] = {}
-        id_to_item: Dict[str, MemoryRecord] = {}
+        scores: dict[str, float] = {}
+        id_to_item: dict[str, MemoryRecord] = {}
 
         for rank, item in enumerate(list_a):
             scores[item.id] = scores.get(item.id, 0) + 1.0 / (k + rank)

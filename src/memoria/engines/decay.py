@@ -13,8 +13,8 @@ import logging
 import math
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
-from typing import Awaitable, Callable, Dict, List, Optional
 
 from memoria.core.config import DecayConfig
 from memoria.core.models import (
@@ -51,7 +51,7 @@ class DecayEngine:
       EVENT:        14
     """
 
-    HALF_LIFE: Dict[MemoryType, float] = {
+    HALF_LIFE: dict[MemoryType, float] = {
         MemoryType.PREFERENCE: float("inf"),
         MemoryType.CONSTRAINT: float("inf"),
         MemoryType.SKILL: 90.0,
@@ -68,11 +68,11 @@ class DecayEngine:
     def __init__(
         self,
         storage: MemoryStoreAdapter,
-        config: Optional[DecayConfig] = None,
+        config: DecayConfig | None = None,
     ):
         self._storage = storage
         self._config = config or DecayConfig()
-        self._background_task: Optional[asyncio.Task] = None
+        self._background_task: asyncio.Task | None = None
         self._stop_event: asyncio.Event = asyncio.Event()
 
         # Apply custom half-life overrides
@@ -220,7 +220,7 @@ class DecayEngine:
         """
         start_time = time.monotonic()
 
-        events: List[MemoryEvent] = []
+        events: list[MemoryEvent] = []
         stats = {
             "promoted": 0,
             "demoted": 0,

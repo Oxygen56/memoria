@@ -45,6 +45,7 @@ AI agents today are **goldfish with GPUs**. Here's the problem:
 ```python
 from memoria import Memoria
 
+# Default: InMemory storage, no external services required
 async with Memoria() as mem:
     await mem.remember("User prefers dark mode", memory_type="preference")
     await mem.remember("Meeting with Alice at 3pm tomorrow", memory_type="event")
@@ -65,7 +66,7 @@ That's it. Five lines to give your agent a brain.
 | Proactive Recall | ✅ Awareness Engine | ❌ | ❌ | Limited |
 | Knowledge Graph | ✅ Multi-hop traversal | ❌ | ❌ | ❌ |
 | Contradiction Detection | ✅ Multi-provider | ❌ | ❌ | Limited |
-| Storage Agnostic | ✅ Any adapter | ❌ Qdrant only | ❌ Postgres | ❌ Cloud only |
+| Storage Agnostic | ✅ InMemory + PgVector (extensible) | ❌ Qdrant only | ❌ Postgres | ❌ Cloud only |
 | Deployment | Embedded SDK | Server required | Server required | SaaS |
 | Fully Open Source | ✅ MIT | ✅ | ✅ | ❌ Core closed |
 
@@ -91,7 +92,7 @@ graph TB
     StorageRouter --> WARM[WARM Tier]
     StorageRouter --> COLD[COLD Tier]
     
-    HOT --> Adapter1[InMemory / ChromaDB / PgVector]
+    HOT --> Adapter1[InMemory / PgVector]
     WARM --> Adapter1
     COLD --> Adapter1
 ```
@@ -126,7 +127,7 @@ Automatic entity/relation extraction from stored memories. Multi-hop BFS travers
 Three configurable providers: `LLM` (highest accuracy), `CrossEncoder` (balanced), `Heuristic` (fastest). Automatically flags and resolves conflicting memories.
 
 ### 🔌 Storage Adapters
-Built-in: `InMemory`, `ChromaDB`, `PgVector`. Need something else? Implement one interface and plug it in.
+Built-in: `InMemory`, `PgVector` — easily extensible. Need something else? Implement one interface and plug it in.
 
 ### 🔀 RRF Hybrid Search
 Reciprocal Rank Fusion combining semantic similarity + keyword matching for retrieval that actually works in production.
@@ -136,13 +137,12 @@ Reciprocal Rank Fusion combining semantic similarity + keyword matching for retr
 ## 📦 Installation
 
 ```bash
-# PyPI (coming soon)
-pip install memoria-agent
+pip install memoria-agent  # PyPI release coming soon
 
-# From source (recommended for now)
+# For now, install from source:
 git clone https://github.com/Oxygen56/memoria.git
 cd memoria
-pip install -e ".[dev]"
+pip install -e .
 ```
 
 ---
@@ -150,24 +150,18 @@ pip install -e ".[dev]"
 ## ⚙️ Configuration
 
 ```python
-from memoria.config import MemoriaConfig
+from memoria.core.config import MemoriaConfig, StorageBackendConfig, DecayConfig
 
 config = MemoriaConfig(
-    # Storage backend
-    storage_backend="chromadb",          # "memory" | "chromadb" | "pgvector"
+    # Storage backend ("memory" or "pgvector")
+    warm_backend=StorageBackendConfig(type="memory"),
     
     # Decay parameters
-    decay_enabled=True,
-    decay_check_interval=3600,           # seconds
-    
-    # Engine toggles
-    awareness_enabled=True,
-    graph_enabled=True,
-    contradiction_detection="llm",       # "llm" | "crossencoder" | "heuristic"
-    
-    # Tier thresholds
-    hot_threshold=0.7,
-    cold_threshold=0.3,
+    decay=DecayConfig(
+        decay_cycle_interval_hours=6,
+        warm_to_cold_threshold=0.3,
+        cold_to_oblivion_threshold=0.05,
+    ),
 )
 ```
 
@@ -178,8 +172,16 @@ Every parameter has a sensible default. Override only what you need.
 ## 🔗 Integrations
 
 - **Any LLM framework** — works with LangChain, CrewAI, OpenAI Agents SDK, or raw API calls
-- **MCP Server** — Model Context Protocol support (coming soon)
-- **REST API** — standalone server mode for language-agnostic access (coming soon)
+
+---
+
+## 💻 CLI
+
+```bash
+memoria remember "User prefers dark mode" --type preference
+memoria recall "user preferences"
+memoria stats
+```
 
 ---
 
@@ -187,6 +189,7 @@ Every parameter has a sensible default. Override only what you need.
 
 - [ ] PyPI package release
 - [ ] MCP server integration
+- [ ] REST API — standalone server mode for language-agnostic access
 - [ ] Dashboard UI for memory visualization
 - [ ] Multi-agent shared memory
 - [ ] Benchmarks against Mem0 / Letta / Zep
